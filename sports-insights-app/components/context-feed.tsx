@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, TrendingDown, Play, MoreHorizontal } from "lucide-react"
+import { apiService, PlayData } from "@/lib/api"
 
 interface ContextItem {
   id: string
@@ -18,79 +19,72 @@ interface ContextItem {
 }
 
 export function ContextFeed() {
-  const [contextItems, setContextItems] = useState<ContextItem[]>([
-    {
-      id: "1",
-      timestamp: "2 min ago",
-      play: "4th & 1 Conversion",
-      context:
-        "Chiefs convert on 4th down with 78% success rate in this situation. Smart aggressive call maintains drive momentum.",
-      impact: "positive",
-      winProbabilityChange: 8,
-      category: "strategy",
-      hasReplay: true,
-    },
-    {
-      id: "2",
-      timestamp: "4 min ago",
-      play: "Defensive Sack",
-      context: "That sack drops Bills' 4th-quarter win probability by 12%. Forces punt from own territory.",
-      impact: "negative",
-      winProbabilityChange: -12,
-      category: "momentum",
-      hasReplay: true,
-    },
-    {
-      id: "3",
-      timestamp: "6 min ago",
-      play: "Clock Management",
-      context: "Chiefs slowing pace (3.2 seconds per snap) to protect 4-point lead. Textbook game management.",
-      impact: "neutral",
-      winProbabilityChange: 0,
-      category: "strategy",
-      hasReplay: false,
-    },
-    {
-      id: "4",
-      timestamp: "8 min ago",
-      play: "Red Zone Entry",
-      context:
-        "Bills enter red zone for 3rd time. They're converting 67% of red zone trips today vs 58% season average.",
-      impact: "positive",
-      winProbabilityChange: 5,
-      category: "stats",
-      hasReplay: false,
-    },
-  ])
+  const [contextItems, setContextItems] = useState<ContextItem[]>([])
+  const [isConnected, setIsConnected] = useState(false)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
 
-  // Simulate new context items
+  // Subscribe to real-time play data
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newContexts = [
-        "Third down conversion extends drive - Bills now 6/8 on third downs today",
-        "Timeout usage: Chiefs have 2 left, Bills have 1. Clock management becomes crucial.",
-        "Weather factor: 15mph winds affecting passing game accuracy by 8%",
-        "Injury update: Star receiver questionable, impacts red zone target distribution",
-      ]
-
-      const randomContext = newContexts[Math.floor(Math.random() * newContexts.length)]
+    const handleNewPlay = (play: PlayData) => {
+      const context = apiService.generateContextFromPlay(play)
+      const winProbChange = apiService.calculateWinProbabilityChange(play, {
+        homeTeam: "WAS",
+        awayTeam: "ATL",
+        homeScore: 0,
+        awayScore: 0,
+        quarter: "1st",
+        timeLeft: "15:00",
+        possession: "home",
+        down: 1,
+        distance: 10,
+        yardLine: 25,
+        winProbability: { home: 50, away: 50 },
+        driveInfo: { plays: 0, yards: 0, timeOfPossession: "0:00" }
+      })
 
       const newItem: ContextItem = {
-        id: Date.now().toString(),
+        id: `${play.quarter}-${play.time}-${Date.now()}`,
         timestamp: "Just now",
-        play: "Live Update",
-        context: randomContext,
-        impact: Math.random() > 0.5 ? "positive" : "negative",
-        winProbabilityChange: Math.floor(Math.random() * 10) - 5,
-        category: "stats",
-        hasReplay: false,
+        play: `${play.offense_team} ${play.down}${getOrdinalSuffix(play.down)} & ${play.yards_to_go}`,
+        context: context,
+        impact: winProbChange > 0 ? "positive" : winProbChange < 0 ? "negative" : "neutral",
+        winProbabilityChange: Math.round(winProbChange),
+        category: getPlayCategory(play),
+        hasReplay: play.yards_gained !== 0,
       }
 
       setContextItems((prev) => [newItem, ...prev.slice(0, 4)])
-    }, 15000)
+      setIsConnected(true)
+      setConnectionError(null)
+    }
 
-    return () => clearInterval(interval)
+    const handleConnectionStatus = (connected: boolean, error?: string) => {
+      setIsConnected(connected)
+      setConnectionError(error || null)
+    }
+
+    // Subscribe to play updates and connection status
+    apiService.subscribeToPlays(handleNewPlay)
+    apiService.subscribeToConnectionStatus(handleConnectionStatus)
+
+    return () => {
+      apiService.unsubscribeFromPlays(handleNewPlay)
+      apiService.unsubscribeFromConnectionStatus(handleConnectionStatus)
+    }
   }, [])
+
+  const getPlayCategory = (play: PlayData): "strategy" | "momentum" | "stats" | "prediction" => {
+    if (play.down === 4) return "strategy"
+    if (play.yards_gained > 10 || play.yards_gained < -5) return "momentum"
+    if (play.yard_line < 20) return "stats"
+    return "prediction"
+  }
+
+  const getOrdinalSuffix = (num: number): string => {
+    const suffixes = ["th", "st", "nd", "rd"]
+    const v = num % 100
+    return suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]
+  }
 
   const getImpactIcon = (impact: string, change: number) => {
     if (change > 0) return <TrendingUp className="w-4 h-4 text-accent" />
@@ -115,6 +109,22 @@ export function ContextFeed() {
 
   return (
     <div className="space-y-4">
+      {/* Connection Status */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-primary animate-pulse' : 'bg-destructive'}`} />
+        <span className="text-xs text-muted-foreground">
+          {isConnected ? 'Live data connected' : connectionError || 'Connecting...'}
+        </span>
+      </div>
+
+      {contextItems.length === 0 && !connectionError && (
+        <Card className="p-4 bg-card border-border">
+          <div className="text-center text-muted-foreground">
+            <div className="animate-pulse">Waiting for live play data...</div>
+          </div>
+        </Card>
+      )}
+
       {contextItems.map((item, index) => (
         <Card
           key={item.id}

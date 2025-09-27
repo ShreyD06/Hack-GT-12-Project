@@ -1,0 +1,321 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use, trying 3001 instead.
+  ▲ Next.js 14.2.16
+  - Local:        http://localhost:3001
+
+ ✓ Starting...
+ ✓ Ready in 1543ms
+ ○ Compiling / ...
+ ✓ Compiled / in 962ms (541 modules)
+ GET / 200 in 1086ms
+ GET / 200 in 18ms
+ GET / 200 in 23ms
+ ✓ Compiled in 502ms (541 modules)
+ ✓ Compiled in 406ms (541 modules)
+ ✓ Compiled in 257ms (541 modules)
+ ✓ Compiled in 254ms (541 modules)
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+     ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:105:1]
+ [2m105[0m |   }
+ [2m106[0m | 
+ [2m107[0m |   // Unsubscribe from play updates
+ [2m108[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+     : [31;1m                               ^[0m
+ [2m109[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m110[0m |     
+ [2m111[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+     ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:105:1]
+ [2m105[0m |   }
+ [2m106[0m | 
+ [2m107[0m |   // Unsubscribe from play updates
+ [2m108[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+     : [31;1m                               ^[0m
+ [2m109[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m110[0m |     
+ [2m111[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+     ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:105:1]
+ [2m105[0m |   }
+ [2m106[0m | 
+ [2m107[0m |   // Unsubscribe from play updates
+ [2m108[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+     : [31;1m                               ^[0m
+ [2m109[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m110[0m |     
+ [2m111[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+     ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:105:1]
+ [2m105[0m |   }
+ [2m106[0m | 
+ [2m107[0m |   // Unsubscribe from play updates
+ [2m108[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+     : [31;1m                               ^[0m
+ [2m109[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m110[0m |     
+ [2m111[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+     ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:105:1]
+ [2m105[0m |   }
+ [2m106[0m | 
+ [2m107[0m |   // Unsubscribe from play updates
+ [2m108[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+     : [31;1m                               ^[0m
+ [2m109[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m110[0m |     
+ [2m111[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+     ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:105:1]
+ [2m105[0m |   }
+ [2m106[0m | 
+ [2m107[0m |   // Unsubscribe from play updates
+ [2m108[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+     : [31;1m                               ^[0m
+ [2m109[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m110[0m |     
+ [2m111[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+     ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:105:1]
+ [2m105[0m |   }
+ [2m106[0m | 
+ [2m107[0m |   // Unsubscribe from play updates
+ [2m108[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+     : [31;1m                               ^[0m
+ [2m109[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m110[0m |     
+ [2m111[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+     ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:105:1]
+ [2m105[0m |   }
+ [2m106[0m | 
+ [2m107[0m |   // Unsubscribe from play updates
+ [2m108[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+     : [31;1m                               ^[0m
+ [2m109[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m110[0m |     
+ [2m111[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+     ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:98:1]
+ [2m 98[0m |   }
+ [2m 99[0m | 
+ [2m100[0m |   // Unsubscribe from play updates
+ [2m101[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+     : [31;1m                               ^[0m
+ [2m102[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m103[0m |     
+ [2m104[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+     ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:97:1]
+ [2m 97[0m |   }
+ [2m 98[0m | 
+ [2m 99[0m |   // Unsubscribe from play updates
+ [2m100[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+     : [31;1m                               ^[0m
+ [2m101[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m102[0m |     
+ [2m103[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+     ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:96:1]
+ [2m 96[0m |   }
+ [2m 97[0m | 
+ [2m 98[0m |   // Unsubscribe from play updates
+ [2m 99[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+     : [31;1m                               ^[0m
+ [2m100[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m101[0m |     
+ [2m102[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+    ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:87:1]
+ [2m87[0m |   }
+ [2m88[0m | 
+ [2m89[0m |   // Unsubscribe from play updates
+ [2m90[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+    : [31;1m                               ^[0m
+ [2m91[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m92[0m |     
+ [2m93[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+    ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:87:1]
+ [2m87[0m |   }
+ [2m88[0m | 
+ [2m89[0m |   // Unsubscribe from play updates
+ [2m90[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+    : [31;1m                               ^[0m
+ [2m91[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m92[0m |     
+ [2m93[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ⨯ ./lib/api.ts
+Error: 
+  [31mx[0m Expected ',', got ':'
+    ,-[[36;1;4m/Users/rohakagarwal/Documents/GitHub/Hack-GT-12-Project/sports-insights-app/lib/api.ts[0m:87:1]
+ [2m87[0m |   }
+ [2m88[0m | 
+ [2m89[0m |   // Unsubscribe from play updates
+ [2m90[0m |   unsubscribeFromPlays(callback: (play: PlayData) => void) {
+    : [31;1m                               ^[0m
+ [2m91[0m |     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
+ [2m92[0m |     
+ [2m93[0m |     if (this.playCallbacks.length === 0 && this.eventSource) {
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/api.ts
+./components/live-game-tile.tsx
+./app/page.tsx
+ ✓ Compiled in 355ms (541 modules)
+ ✓ Compiled in 300ms (541 modules)
+ ✓ Compiled in 276ms (541 modules)
+ ✓ Compiled in 255ms (541 modules)
+ ✓ Compiled in 463ms (541 modules)
+ ✓ Compiled in 220ms (541 modules)
+ ✓ Compiled in 215ms (541 modules)
+ ✓ Compiled in 229ms (541 modules)

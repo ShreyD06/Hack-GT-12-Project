@@ -5,74 +5,53 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Play, Clock, MapPin } from "lucide-react"
-
-interface GameState {
-  homeTeam: string
-  awayTeam: string
-  homeScore: number
-  awayScore: number
-  quarter: string
-  timeLeft: string
-  possession: "home" | "away"
-  down: number
-  distance: number
-  yardLine: number
-  winProbability: {
-    home: number
-    away: number
-  }
-  driveInfo: {
-    plays: number
-    yards: number
-    timeOfPossession: string
-  }
-}
+import { apiService, GameState, PlayData } from "@/lib/api"
 
 export function LiveGameTile() {
   const [gameState, setGameState] = useState<GameState>({
-    homeTeam: "Chiefs",
-    awayTeam: "Bills",
-    homeScore: 21,
-    awayScore: 17,
-    quarter: "4th",
-    timeLeft: "8:42",
+    homeTeam: "WAS",
+    awayTeam: "ATL",
+    homeScore: 0,
+    awayScore: 0,
+    quarter: "1st",
+    timeLeft: "15:00",
     possession: "home",
-    down: 2,
-    distance: 7,
-    yardLine: 35,
+    down: 1,
+    distance: 10,
+    yardLine: 25,
     winProbability: {
-      home: 68,
-      away: 32,
+      home: 50,
+      away: 50,
     },
     driveInfo: {
-      plays: 6,
-      yards: 45,
-      timeOfPossession: "3:18",
+      plays: 0,
+      yards: 0,
+      timeOfPossession: "0:00",
     },
   })
 
-  // Simulate live updates
+  // Subscribe to real-time play updates
   useEffect(() => {
-    const interval = setInterval(() => {
-      setGameState((prev) => ({
-        ...prev,
-        timeLeft: updateTime(prev.timeLeft),
-        winProbability: {
-          home: Math.max(30, Math.min(70, prev.winProbability.home + (Math.random() - 0.5) * 4)),
-          away: Math.max(30, Math.min(70, prev.winProbability.away + (Math.random() - 0.5) * 4)),
-        },
-      }))
-    }, 3000)
+    const handleNewPlay = (play: PlayData) => {
+      setGameState(prevState => {
+        const updatedState = apiService.updateGameStateFromPlay(play, prevState)
+        return updatedState
+      })
+    }
 
-    return () => clearInterval(interval)
+    const handleGameStateUpdate = (gameState: GameState) => {
+      setGameState(gameState)
+    }
+
+    // Subscribe to play updates and game state changes
+    apiService.subscribeToPlays(handleNewPlay)
+    apiService.subscribeToGameState(handleGameStateUpdate)
+
+    return () => {
+      apiService.unsubscribeFromPlays(handleNewPlay)
+      apiService.unsubscribeFromGameState(handleGameStateUpdate)
+    }
   }, [])
-
-  const updateTime = (time: string) => {
-    const [minutes, seconds] = time.split(":").map(Number)
-    const totalSeconds = minutes * 60 + seconds - 1
-    if (totalSeconds <= 0) return "0:00"
-    return `${Math.floor(totalSeconds / 60)}:${(totalSeconds % 60).toString().padStart(2, "0")}`
-  }
 
   return (
     <Card className="p-6 bg-card border-border live-pulse">
