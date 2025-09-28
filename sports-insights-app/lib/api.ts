@@ -205,14 +205,15 @@ Commentary:`;
   }
 
   // Generate AI analysis for play context
-  async generatePlayAnalysis(play: PlayData, gameState: GameState): Promise<string> {
-    if (!ai) {
-      console.error('Gemini AI not initialized. Please set your API key.');
-      return 'Analysis unavailable - API key not configured';
-    }
+// Generate AI analysis for play context
+async generatePlayAnalysis(play: PlayData, gameState: GameState): Promise<string> {
+  if (!ai) {
+    console.error('Gemini AI not initialized. Please set your API key.');
+    return 'Analysis unavailable - API key not configured';
+  }
 
-    try {
-      const analysisPrompt = `As an NFL analyst, provide tactical insights for this play:
+  try {
+    const analysisPrompt = `As an NFL analyst, provide tactical insights for this play:
 
 Game Situation:
 - ${gameState.homeTeam} vs ${gameState.awayTeam}
@@ -224,22 +225,27 @@ Play: ${play.description}
 
 Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or impact.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: analysisPrompt,
-          config: {
-          thinkingConfig: {
-            thinkingBudget: 0, // Disables thinking
-          },
-        }
-      });
-      
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: analysisPrompt,
+      config: {
+        thinkingConfig: {
+          thinkingBudget: 0, // Disables thinking
+        },
+      },
+    });
+
+    if (response.text) {
       return response.text.trim();
-    } catch (error) {
-      console.error('Error generating play analysis:', error);
-      throw error;
     }
+
+    // 🔹 Ensure we always return a string, even if response.text is missing
+    return "Analysis unavailable - empty response";
+  } catch (error) {
+    console.error('Error generating play analysis:', error);
+    return "Analysis unavailable - error generating analysis";
   }
+}
 
   // Public method for generating context/commentary
   generateContext(play: PlayData, gameState?: GameState): string {
