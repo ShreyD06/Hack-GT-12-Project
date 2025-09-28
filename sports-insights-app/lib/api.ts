@@ -1,5 +1,21 @@
-// API service for connecting to FastAPI backend
+import { GoogleGenAI } from '@google/genai';
+
 const API_BASE_URL = 'http://localhost:8000'; // Adjust this to your FastAPI server URL
+
+// Add your Gemini API key here or use environment variable
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY; // Replace this with your real API key
+
+// Initialize Gemini AI
+let ai: GoogleGenAI | null = null;
+
+if (GEMINI_API_KEY) {
+  try {
+    ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    console.log('Gemini AI initialized successfully');
+  } catch (error) {
+    console.error('Error initializing Gemini AI:', error);
+  }
+}
 
 export interface PlayData {
   quarter: number;
@@ -40,13 +56,45 @@ export interface GameState {
   };
 }
 
+export interface EnhancedPlayData extends PlayData {
+  aiCommentary?: string;
+  contextInsights?: string;
+}
+
 class ApiService {
   private eventSource: EventSource | null = null;
-  private playCallbacks: ((play: PlayData) => void)[] = [];
+  private playCallbacks: ((play: EnhancedPlayData) => void)[] = [];
   private gameStateCallbacks: ((gameState: GameState) => void)[] = [];
   private connectionCallbacks: ((connected: boolean, error?: string) => void)[] = [];
   private isConnected: boolean = false;
   private currentGameId: string = '2024122802'; // Default game ID
+  private gameContext: {
+    homeTeam: string;
+    awayTeam: string;
+    homeScore: number;
+    awayScore: number;
+  } = {
+    homeTeam: '',
+    awayTeam: '',
+    homeScore: 0,
+    awayScore: 0
+  };
+
+  // Initialize or reinitialize Gemini with API key
+  initializeGemini(apiKey?: string) {
+    const keyToUse = apiKey || GEMINI_API_KEY;
+    if (keyToUse && keyToUse !== 'YOUR_ACTUAL_API_KEY_GOES_HERE') {
+      try {
+        ai = new GoogleGenAI({ apiKey: keyToUse });
+        console.log('Gemini AI initialized successfully');
+        return true;
+      } catch (error) {
+        console.error('Error initializing Gemini AI:', error);
+        return false;
+      }
+    }
+    return false;
+  }
 
   // Fetch team information for a specific game
   async fetchGameTeams(gameId?: string): Promise<GameTeams> {
@@ -57,12 +105,146 @@ class ApiService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const teams = await response.json();
+      
+      // Update game context
+      this.gameContext.homeTeam = teams.home_team;
+      this.gameContext.awayTeam = teams.away_team;
+      
       return teams;
     } catch (error) {
       console.error('Error fetching game teams:', error);
       // Return fallback teams
       return { home_team: 'HOME', away_team: 'AWAY' };
     }
+  }
+
+  // Generate AI commentary using Gemini library
+  async generateAICommentary(play: PlayData, gameState: GameState): Promise<string> {
+    if (!ai) {
+      console.error('Gemini AI not initialized. Please set your API key.');
+      return 'AI Commentary unavailable - API key not configured';
+    }
+
+    try {
+      const prompt = this.buildCommentaryPrompt(play, gameState);
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+      
+      const commentary = response.text;
+      
+      if (!commentary || commentary.trim().length === 0) {
+        throw new Error('Empty commentary generated');
+      }
+
+      return commentary.trim();
+    } catch (error) {
+      console.error('Error generating Gemini commentary:', error);
+      throw error; // Re-throw the error instead of using fallback
+    }
+  }
+
+  // Build prompt for Gemini API
+  private buildCommentaryPrompt(play: PlayData, gameState: GameState): string {
+    const situationalContext = this.getSituationalContext(play, gameState);
+    
+    return `You are a professional NFL play-by-play commentator. Generate clean, engaging commentary for this play.
+
+Game Context:
+- ${gameState.homeTeam} (Home) vs ${gameState.awayTeam} (Away)
+- Score: ${gameState.homeTeam} ${gameState.homeScore} - ${gameState.awayTeam} ${gameState.awayScore}
+- ${gameState.quarter} Quarter, ${gameState.timeLeft} remaining
+
+Play Details:
+- Down: ${play.down}, Distance: ${play.yards_to_go} yards
+- Field Position: ${play.yard_line} yard line
+- Offense: ${play.offense_team}
+- Defense: ${play.defense_team}
+- Yards Gained: ${play.yards_gained}
+- Original Description: "${play.description}"
+
+Situational Context: ${situationalContext}
+
+Generate a single, concise sentence of professional commentary (max 25 words) that:
+1. Is exciting and engaging
+2. Mentions the key result (yards gained/lost, scoring, etc.)
+3. Uses proper NFL terminology
+4. Maintains consistent team references
+5. Captures the significance of the moment
+
+Commentary:`;
+  }
+
+  // Get situational context for better commentary
+  private getSituationalContext(play: PlayData, gameState: GameState): string {
+    const contexts = [];
+    
+    if (play.yard_line <= 20) {
+      contexts.push("Red zone opportunity");
+    }
+    
+    if (play.down === 4) {
+      contexts.push("Critical 4th down");
+    }
+    
+    if (play.yards_to_go >= 10) {
+      contexts.push("Long distance situation");
+    }
+    
+    if (gameState.quarter === "4th" && Math.abs(gameState.homeScore - gameState.awayScore) <= 7) {
+      contexts.push("Close game in final quarter");
+    }
+    
+    if (play.yards_gained >= 20) {
+      contexts.push("Big play potential");
+    }
+    
+    return contexts.length > 0 ? contexts.join(", ") : "Standard play situation";
+  }
+
+  // Generate AI analysis for play context
+  async generatePlayAnalysis(play: PlayData, gameState: GameState): Promise<string> {
+    if (!ai) {
+      console.error('Gemini AI not initialized. Please set your API key.');
+      return 'Analysis unavailable - API key not configured';
+    }
+
+    try {
+      const analysisPrompt = `As an NFL analyst, provide tactical insights for this play:
+
+Game Situation:
+- ${gameState.homeTeam} vs ${gameState.awayTeam}
+- Down: ${play.down}, Distance: ${play.yards_to_go}
+- Field Position: ${play.yard_line} yard line
+- Result: ${play.yards_gained} yards
+
+Play: ${play.description}
+
+Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or impact.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: analysisPrompt,
+          config: {
+          thinkingConfig: {
+            thinkingBudget: 0, // Disables thinking
+          },
+        }
+      });
+      
+      return response.text.trim();
+    } catch (error) {
+      console.error('Error generating play analysis:', error);
+      throw error;
+    }
+  }
+
+  // Public method for generating context/commentary
+  generateContext(play: PlayData, gameState?: GameState): string {
+    // Since we removed fallback, this will be handled asynchronously
+    return 'Loading AI commentary...';
   }
 
   // Set the current game ID
@@ -76,16 +258,48 @@ class ApiService {
   }
 
   // Subscribe to live play updates via Server-Sent Events
-  subscribeToPlays(callback: (play: PlayData) => void) {
+  subscribeToPlays(callback: (play: EnhancedPlayData) => void) {
     this.playCallbacks.push(callback);
     
     if (!this.eventSource) {
       this.eventSource = new EventSource(`${API_BASE_URL}/stream-plays/${this.currentGameId}`);
       
-      this.eventSource.onmessage = (event) => {
+      this.eventSource.onmessage = async (event) => {
         try {
           const playData: PlayData = JSON.parse(event.data);
-          this.playCallbacks.forEach(cb => cb(playData));
+          
+          // Create initial enhanced play data with loading state
+          const enhancedPlay: EnhancedPlayData = {
+            ...playData,
+            aiCommentary: 'Generating AI commentary...',
+            contextInsights: this.generateContextInsights(playData)
+          };
+          
+          // Send immediate callback with loading state
+          this.playCallbacks.forEach(cb => cb(enhancedPlay));
+          
+          // Generate AI commentary asynchronously
+          try {
+            const gameState = this.getCurrentGameState(playData);
+            const aiCommentary = await this.generateAICommentary(playData, gameState);
+            
+            // Send updated callback with AI commentary
+            const finalEnhancedPlay: EnhancedPlayData = {
+              ...enhancedPlay,
+              aiCommentary
+            };
+            
+            this.playCallbacks.forEach(cb => cb(finalEnhancedPlay));
+          } catch (commentaryError) {
+            // Send error state if commentary generation fails
+            const errorPlay: EnhancedPlayData = {
+              ...enhancedPlay,
+              aiCommentary: 'AI commentary failed to generate'
+            };
+            
+            this.playCallbacks.forEach(cb => cb(errorPlay));
+          }
+          
           // Update connection status on successful message
           if (!this.isConnected) {
             this.isConnected = true;
@@ -118,8 +332,49 @@ class ApiService {
     }
   }
 
+  // Generate context insights from play data
+  private generateContextInsights(play: PlayData): string {
+    const insights = [];
+    
+    if (play.yards_gained > 15) {
+      insights.push(`Big play alert: ${play.yards_gained} yards`);
+    }
+    
+    if (play.down === 4) {
+      insights.push(`4th down: ${play.yards_to_go} yards needed`);
+    }
+    
+    if (play.yard_line <= 20) {
+      insights.push(`Red zone: ${play.yard_line} yards from end zone`);
+    }
+    
+    if (play.yards_gained < -5) {
+      insights.push(`Major loss: ${Math.abs(play.yards_gained)} yards back`);
+    }
+    
+    return insights.join(' • ');
+  }
+
+  // Get current game state for context
+  private getCurrentGameState(play: PlayData): GameState {
+    return {
+      homeTeam: this.gameContext.homeTeam || 'HOME',
+      awayTeam: this.gameContext.awayTeam || 'AWAY',
+      homeScore: this.gameContext.homeScore,
+      awayScore: this.gameContext.awayScore,
+      quarter: `${play.quarter}${this.getOrdinalSuffix(play.quarter)}`,
+      timeLeft: this.formatTimeRemaining(play.time),
+      possession: play.offense_team === this.gameContext.homeTeam ? "home" : "away",
+      down: play.down,
+      distance: play.yards_to_go,
+      yardLine: play.yard_line,
+      winProbability: { home: 50, away: 50 }, // Simplified for now
+      driveInfo: { plays: 0, yards: 0, timeOfPossession: "0:00" }
+    };
+  }
+
   // Unsubscribe from play updates
-  unsubscribeFromPlays(callback: (play: PlayData) => void) {
+  unsubscribeFromPlays(callback: (play: EnhancedPlayData) => void) {
     this.playCallbacks = this.playCallbacks.filter(cb => cb !== callback);
     
     if (this.playCallbacks.length === 0 && this.eventSource) {
@@ -190,16 +445,20 @@ class ApiService {
     if (description.includes('TOUCHDOWN')) {
       if (play.offense_team === newGameState.homeTeam) {
         newGameState.homeScore += 6;
+        this.gameContext.homeScore += 6;
       } else {
         newGameState.awayScore += 6;
+        this.gameContext.awayScore += 6;
       }
       // Reset drive info on touchdown
       newGameState.driveInfo = { plays: 0, yards: 0, timeOfPossession: "0:00" };
     } else if (description.includes('FIELD GOAL')) {
       if (play.offense_team === newGameState.homeTeam) {
         newGameState.homeScore += 3;
+        this.gameContext.homeScore += 3;
       } else {
         newGameState.awayScore += 3;
+        this.gameContext.awayScore += 3;
       }
       // Reset drive info on field goal
       newGameState.driveInfo = { plays: 0, yards: 0, timeOfPossession: "0:00" };
@@ -207,22 +466,28 @@ class ApiService {
       // Safety gives 2 points to the defense
       if (play.defense_team === newGameState.homeTeam) {
         newGameState.homeScore += 2;
+        this.gameContext.homeScore += 2;
       } else {
         newGameState.awayScore += 2;
+        this.gameContext.awayScore += 2;
       }
     } else if (description.includes('EXTRA POINT') && description.includes('GOOD')) {
       // Extra point conversion
       if (play.offense_team === newGameState.homeTeam) {
         newGameState.homeScore += 1;
+        this.gameContext.homeScore += 1;
       } else {
         newGameState.awayScore += 1;
+        this.gameContext.awayScore += 1;
       }
     } else if (description.includes('TWO-POINT') && description.includes('GOOD')) {
       // Two-point conversion
       if (play.offense_team === newGameState.homeTeam) {
         newGameState.homeScore += 2;
+        this.gameContext.homeScore += 2;
       } else {
         newGameState.awayScore += 2;
+        this.gameContext.awayScore += 2;
       }
     } else {
       // Regular play - update drive info
@@ -255,29 +520,6 @@ class ApiService {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
-  // Generate context insights from play data
-  generateContextFromPlay(play: PlayData): string {
-    const insights = [];
-    
-    if (play.yards_gained > 15) {
-      insights.push(`Big play! ${play.offense_team} gains ${play.yards_gained} yards.`);
-    }
-    
-    if (play.down === 4) {
-      insights.push(`Critical 4th down situation: ${play.yards_to_go} yards to go.`);
-    }
-    
-    if (play.yard_line < 20) {
-      insights.push(`${play.offense_team} enters the red zone with scoring opportunity.`);
-    }
-    
-    if (play.yards_gained < 0) {
-      insights.push(`Defensive stop! ${play.defense_team} holds ${play.offense_team} to a ${Math.abs(play.yards_gained)}-yard loss.`);
-    }
-    
-    return insights.join(' ') || play.description;
-  }
-
   // Cleanup method
   cleanup() {
     if (this.eventSource) {
@@ -288,6 +530,11 @@ class ApiService {
     this.gameStateCallbacks = [];
     this.connectionCallbacks = [];
     this.isConnected = false;
+  }
+
+  // Set Gemini API key at runtime
+  setGeminiApiKey(apiKey: string): boolean {
+    return this.initializeGemini(apiKey);
   }
 }
 

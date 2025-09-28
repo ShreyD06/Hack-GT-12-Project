@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Play, Clock, MapPin } from "lucide-react"
-import { apiService, GameState, PlayData, GameTeams } from "@/lib/api"
+import { apiService, GameState, PlayData } from "@/lib/api"
 
 export function LiveGameTile() {
   const [gameState, setGameState] = useState<GameState>({
@@ -32,7 +31,6 @@ export function LiveGameTile() {
 
   // Fetch team information and subscribe to real-time play updates
   useEffect(() => {
-    // Fetch team information for the current game
     const fetchTeams = async () => {
       try {
         const teams = await apiService.fetchGameTeams()
@@ -59,7 +57,6 @@ export function LiveGameTile() {
       setGameState(gameState)
     }
 
-    // Subscribe to play updates and game state changes
     apiService.subscribeToPlays(handleNewPlay)
     apiService.subscribeToGameState(handleGameStateUpdate)
 
@@ -102,23 +99,6 @@ export function LiveGameTile() {
           <div className="text-sm text-muted-foreground">{gameState.homeTeam}</div>
         </div>
       </div>
-
-      {/* Win Probability */}
-      <div className="mb-6">
-        <div className="flex justify-between text-xs text-muted-foreground mb-2">
-          <span>Win Probability</span>
-          <span>
-            {gameState.winProbability.home}% - {gameState.winProbability.away}%
-          </span>
-        </div>
-        <div className="h-2 bg-secondary rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary transition-all duration-1000 ease-out"
-            style={{ width: `${gameState.winProbability.home}%` }}
-          />
-        </div>
-      </div>
-
 
       {/* Down & Distance */}
       <div className="flex items-center justify-between">
