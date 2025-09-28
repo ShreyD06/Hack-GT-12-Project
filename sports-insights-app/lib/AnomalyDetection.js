@@ -210,3 +210,5 @@ export class FootballAnomalyDetector {
     return summary.join('\n');
   }
 }
+
+export const anomalyDetect = new FootballAnomalyDetector();

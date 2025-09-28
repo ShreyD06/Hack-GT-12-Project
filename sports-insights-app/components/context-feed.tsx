@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, TrendingDown, Play, MoreHorizontal, Sparkles } from "lucide-react"
 import { apiService, EnhancedPlayData, GameTeams, GameState } from "@/lib/api"
+import { el, pl } from "date-fns/locale"
+import { anomalyDetect } from "@/lib/AnomalyDetection"
 
 interface ContextItem {
   id: string
@@ -20,6 +22,8 @@ interface ContextItem {
   hasReplay: boolean
   isAIGenerated: boolean
 }
+
+export var play_archive: EnhancedPlayData[] = []
 
 export function ContextFeed() {
   const [contextItems, setContextItems] = useState<ContextItem[]>([])
@@ -40,7 +44,13 @@ export function ContextFeed() {
     winProbability: { home: 50, away: 50 },
     driveInfo: { plays: 0, yards: 0, timeOfPossession: "0:00" }
   })
-
+  // Stats for anomaly detection
+  var rushes_per_drive: number[] = []
+  var passes_per_drive: number[] = []
+  var completions_per_drive: number[] = []
+  var rush_counter = 0
+  var pass_counter = 0
+  var completion_counter = 0
   // Use useRef to store current gameState for callbacks
   const gameStateRef = useRef(gameState)
   gameStateRef.current = gameState
@@ -107,6 +117,32 @@ export function ContextFeed() {
         
         return prev
       })
+
+      if (enhancedPlay.play_type === "Run") {
+        // check if new drive: if offense team changed
+        if (play_archive.length > 0 && play_archive[play_archive.length - 1].offense_team !== enhancedPlay.offense_team) {
+          rushes_per_drive.push(rush_counter)
+          rush_counter = 0
+        }
+        rush_counter += 1
+      } else if (enhancedPlay.play_type === "Pass") {
+          if (play_archive.length > 0 && play_archive[play_archive.length - 1].offense_team !== enhancedPlay.offense_team) {
+            passes_per_drive.push(pass_counter)
+            pass_counter = 0
+          }
+          pass_counter += 1
+          if (enhancedPlay.description.toLowerCase().includes("incomplete") === false && play_archive[play_archive.length - 1].offense_team !== enhancedPlay.offense_team) {
+            completions_per_drive.push(completion_counter)
+            completion_counter = 0
+          }
+          completion_counter += 1
+      }
+      // Add play to archive
+      play_archive.push(enhancedPlay)
+
+      // run Anomaly Detection
+      const res = anomalyDetect.detectTrendChanges(rushes_per_drive, "Rushes per drive")
+      console.log(res)
 
       setIsConnected(true)
       setConnectionError(null)
