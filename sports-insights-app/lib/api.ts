@@ -1,5 +1,21 @@
-// API service for connecting to FastAPI backend
+import { GoogleGenAI } from '@google/genai';
+
 const API_BASE_URL = 'http://localhost:8000'; // Adjust this to your FastAPI server URL
+
+// Add your Gemini API key here or use environment variable
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY; // Replace this with your real API key
+
+// Initialize Gemini AI
+let ai: GoogleGenAI | null = null;
+
+if (GEMINI_API_KEY) {
+  try {
+    ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    console.log('Gemini AI initialized successfully');
+  } catch (error) {
+    console.error('Error initializing Gemini AI:', error);
+  }
+}
 
 export interface PlayData {
   quarter: number;
@@ -134,7 +150,8 @@ class ApiService {
   private buildCommentaryPrompt(play: PlayData, gameState: GameState): string {
     const situationalContext = this.getSituationalContext(play, gameState);
     
-    return `You are a professional NFL play-by-play commentator. Generate clean, engaging commentary for this play.
+    return `You are a professional NFL play-by-play commentator. Generate a clean, engaging commentary and explanation for this play.
+    You are generating an explanation for someone who is fairly new to football.
 
 Game Context:
 - ${gameState.homeTeam} (Home) vs ${gameState.awayTeam} (Away)
@@ -151,12 +168,80 @@ Play Details:
 
 Situational Context: ${situationalContext}
 
-Generate a single, concise sentence of professional commentary (max 25 words) that:
+Generate two sentences on two different lines.
+Sentence 1: Generate a single, concise sentence of professional commentary (max 25 words) that:
 1. Is exciting and engaging
 2. Mentions the key result (yards gained/lost, scoring, etc.)
 3. Uses proper NFL terminology
 4. Maintains consistent team references
 5. Captures the significance of the moment
+
+Sentence 2: Generate a concise explanation (max 50 words) that:
+1. Mentions the key result (yards gained/lost, scoring, etc.
+2. Uses proper NFL terminology
+3. Maintains consistent team references
+4. Captures the significance of the moment
+5. Explains why this play is important
+
+
+Commentary:`;
+  }
+
+  async generateAIExplanation(play: PlayData, gameState: GameState): Promise<string> {
+    if (!ai) {
+      console.error('Gemini AI not initialized. Please set your API key.');
+      return 'AI Commentary unavailable - API key not configured';
+    }
+
+    try {
+      const prompt = this.buildCommentaryPromptExplainer(play, gameState);
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+      
+      const commentary = response.text;
+      
+      if (!commentary || commentary.trim().length === 0) {
+        throw new Error('Empty commentary generated');
+      }
+
+      return commentary.trim();
+    } catch (error) {
+      console.error('Error generating Gemini commentary:', error);
+      throw error; // Re-throw the error instead of using fallback
+    }
+  }
+
+  // Build prompt for Gemini API
+  private buildCommentaryPromptExplainer(play: PlayData, gameState: GameState): string {
+    const situationalContext = this.getSituationalContext(play, gameState);
+    
+    return `You are a professional NFL play-by-play commentator. Generate a clean, engaging explanation for why this play is important.
+    You are generating an explanation for someone who is fairly new to football.
+
+Game Context:
+- ${gameState.homeTeam} (Home) vs ${gameState.awayTeam} (Away)
+- Score: ${gameState.homeTeam} ${gameState.homeScore} - ${gameState.awayTeam} ${gameState.awayScore}
+- ${gameState.quarter} Quarter, ${gameState.timeLeft} remaining
+
+Play Details:
+- Down: ${play.down}, Distance: ${play.yards_to_go} yards
+- Field Position: ${play.yard_line} yard line
+- Offense: ${play.offense_team}
+- Defense: ${play.defense_team}
+- Yards Gained: ${play.yards_gained}
+- Original Description: "${play.description}"
+
+Situational Context: ${situationalContext}
+
+Generate a concise explanation (max 50 words) that:
+1. Mentions the key result (yards gained/lost, scoring, etc.
+2. Uses proper NFL terminology
+3. Maintains consistent team references
+4. Captures the significance of the moment
+5. Explains why this play is important
 
 Commentary:`;
   }
@@ -266,6 +351,7 @@ Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or i
           try {
             const gameState = this.getCurrentGameState(playData);
             const aiCommentary = await this.generateAICommentary(playData, gameState);
+            // const aiExplanation = await this.generateAIExplanation(playData, gameState);
             
             // Send updated callback with AI commentary
             const finalEnhancedPlay: EnhancedPlayData = {
