@@ -3,7 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 const API_BASE_URL = 'http://localhost:8000'; // Adjust this to your FastAPI server URL
 
 // Add your Gemini API key here or use environment variable
-const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY; // Replace this with your real API key
+const GEMINI_API_KEY = 'AIzaSyAKIV_XgZtXhm1JXM6nHgkp33J_--QYu0E'; // Replace this with your real API key
 
 // Initialize Gemini AI
 let ai: GoogleGenAI | null = null;
@@ -62,6 +62,14 @@ export interface EnhancedPlayData extends PlayData {
   contextInsights?: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  type: "user" | "assistant";
+  content: string;
+  timestamp: string;
+  suggestions?: string[];
+}
+
 class ApiService {
   private eventSource: EventSource | null = null;
   private playCallbacks: ((play: EnhancedPlayData) => void)[] = [];
@@ -80,6 +88,10 @@ class ApiService {
     homeScore: 0,
     awayScore: 0
   };
+
+  // Store play history for chat context
+  private playHistory: EnhancedPlayData[] = [];
+  private currentGameState: GameState | null = null;
 
   // Initialize or reinitialize Gemini with API key
   initializeGemini(apiKey?: string) {
@@ -147,6 +159,115 @@ class ApiService {
     }
   }
 
+  // Generate chat response using Gemini with full game context
+  async generateChatResponse(userQuestion: string): Promise<{
+    content: string;
+    suggestions: string[];
+  }> {
+    if (!ai) {
+      throw new Error('Gemini AI not initialized. Please set your API key.');
+    }
+
+    try {
+      const prompt = this.buildChatPrompt(userQuestion);
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: prompt,
+      });
+      
+      const fullResponse = response.text?.trim();
+      
+      if (!fullResponse) {
+        throw new Error('Empty response generated');
+      }
+
+      // Parse the response to extract content and suggestions
+      const { content, suggestions } = this.parseChatResponse(fullResponse);
+      
+      return { content, suggestions };
+    } catch (error) {
+      console.error('Error generating chat response:', error);
+      throw error;
+    }
+  }
+
+  // Build comprehensive chat prompt with game context
+  private buildChatPrompt(userQuestion: string): string {
+    const recentPlays = this.playHistory.slice(-10); // Last 10 plays for context
+    const gameState = this.currentGameState;
+    
+    const playHistoryText = recentPlays.map((play, index) => 
+      `Play ${index + 1}: Q${play.quarter} ${this.formatTimeRemaining(play.time)} - ${play.offense_team} ${play.down} & ${play.yards_to_go} at ${play.yard_line} yard line: ${play.description} (${play.yards_gained} yards)`
+    ).join('\n');
+
+    return `You are an expert NFL analyst providing real-time insights about an ongoing football game. Answer the user's question based on the current game context and play history.
+
+CURRENT GAME STATUS:
+- Teams: ${gameState?.homeTeam || this.gameContext.homeTeam} (Home) vs ${gameState?.awayTeam || this.gameContext.awayTeam} (Away)
+- Score: ${gameState?.homeTeam || 'Home'} ${gameState?.homeScore || 0} - ${gameState?.awayTeam || 'Away'} ${gameState?.awayScore || 0}
+- Current Situation: ${gameState?.quarter || '1st'} Quarter, ${gameState?.timeLeft || 'N/A'} remaining
+- Possession: ${gameState?.possession === 'home' ? (gameState?.homeTeam || 'Home') : (gameState?.awayTeam || 'Away')}
+- Down & Distance: ${gameState?.down || 'N/A'} & ${gameState?.distance || 'N/A'}
+- Field Position: ${gameState?.yardLine || 'N/A'} yard line
+- Win Probability: ${gameState?.homeTeam || 'Home'} ${gameState?.winProbability?.home || 50}% - ${gameState?.awayTeam || 'Away'} ${gameState?.winProbability?.away || 50}%
+
+RECENT PLAY HISTORY:
+${playHistoryText || 'No recent plays available'}
+
+DRIVE INFO:
+- Plays this drive: ${gameState?.driveInfo?.plays || 0}
+- Yards this drive: ${gameState?.driveInfo?.yards || 0}
+- Time of possession this drive: ${gameState?.driveInfo?.timeOfPossession || '0:00'}
+
+USER QUESTION: "${userQuestion}"
+
+Provide a comprehensive answer that consists of 1 paragraph maximum:
+1. Directly addresses the user's question using specific game data
+2. Explains it in terms that a beginner would understand
+2. References relevant plays from the history when applicable
+3. Explains the strategic context and implications
+4. Uses proper NFL terminology
+5. Keeps the response engaging and informative
+
+After your main response, provide 3 relevant follow-up questions that the user might be interested in asking next, separated by "SUGGESTIONS:" on a new line.
+
+Format your response exactly like this:
+[Your detailed answer here]
+
+SUGGESTIONS:
+1. [First suggestion]
+2. [Second suggestion] 
+3. [Third suggestion]`;
+  }
+
+  // Parse chat response to extract content and suggestions
+  private parseChatResponse(fullResponse: string): { content: string; suggestions: string[] } {
+    const parts = fullResponse.split('SUGGESTIONS:');
+    const content = parts[0].trim();
+    
+    let suggestions: string[] = [];
+    if (parts[1]) {
+      suggestions = parts[1]
+        .trim()
+        .split('\n')
+        .map(line => line.replace(/^\d+\.\s*/, '').trim())
+        .filter(suggestion => suggestion.length > 0)
+        .slice(0, 3); // Limit to 3 suggestions
+    }
+    
+    // Fallback suggestions if none were provided
+    if (suggestions.length === 0) {
+      suggestions = [
+        "Tell me more about this situation",
+        "What should they do next?",
+        "Show me the key stats"
+      ];
+    }
+    
+    return { content, suggestions };
+  }
+
   // Build prompt for Gemini API
   private buildCommentaryPrompt(play: PlayData, gameState: GameState): string {
     const situationalContext = this.getSituationalContext(play, gameState);
@@ -187,66 +308,6 @@ Sentence 2: Generate a concise explanation (max 50 words) that:
 
 Commentary:`;
   }
-
-  async generateAIExplanation(play: PlayData, gameState: GameState): Promise<string> {
-    if (!ai) {
-      console.error('Gemini AI not initialized. Please set your API key.');
-      return 'AI Commentary unavailable - API key not configured';
-    }
-
-    try {
-      const prompt = this.buildCommentaryPromptExplainer(play, gameState);
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-      });
-      
-      const commentary = response.text;
-      
-      if (!commentary || commentary.trim().length === 0) {
-        throw new Error('Empty commentary generated');
-      }
-
-      return commentary.trim();
-    } catch (error) {
-      console.error('Error generating Gemini commentary:', error);
-      throw error; // Re-throw the error instead of using fallback
-    }
-  }
-
-  // Build prompt for Gemini API
-  private buildCommentaryPromptExplainer(play: PlayData, gameState: GameState): string {
-    const situationalContext = this.getSituationalContext(play, gameState);
-    
-    return `You are a professional NFL play-by-play commentator. Generate a clean, engaging explanation for why this play is important.
-    You are generating an explanation for someone who is fairly new to football.
-
-Game Context:
-- ${gameState.homeTeam} (Home) vs ${gameState.awayTeam} (Away)
-- Score: ${gameState.homeTeam} ${gameState.homeScore} - ${gameState.awayTeam} ${gameState.awayScore}
-- ${gameState.quarter} Quarter, ${gameState.timeLeft} remaining
-
-Play Details:
-- Down: ${play.down}, Distance: ${play.yards_to_go} yards
-- Field Position: ${play.yard_line} yard line
-- Offense: ${play.offense_team}
-- Defense: ${play.defense_team}
-- Yards Gained: ${play.yards_gained}
-- Original Description: "${play.description}"
-
-Situational Context: ${situationalContext}
-
-Generate a concise explanation (max 50 words) that:
-1. Mentions the key result (yards gained/lost, scoring, etc.
-2. Uses proper NFL terminology
-3. Maintains consistent team references
-4. Captures the significance of the moment
-5. Explains why this play is important
-
-Commentary:`;
-  }
-
   // Get situational context for better commentary
   private getSituationalContext(play: PlayData, gameState: GameState): string {
     const contexts = [];
@@ -275,15 +336,14 @@ Commentary:`;
   }
 
   // Generate AI analysis for play context
-// Generate AI analysis for play context
-async generatePlayAnalysis(play: PlayData, gameState: GameState): Promise<string> {
-  if (!ai) {
-    console.error('Gemini AI not initialized. Please set your API key.');
-    return 'Analysis unavailable - API key not configured';
-  }
+  async generatePlayAnalysis(play: PlayData, gameState: GameState): Promise<string> {
+    if (!ai) {
+      console.error('Gemini AI not initialized. Please set your API key.');
+      return 'Analysis unavailable - API key not configured';
+    }
 
-  try {
-    const analysisPrompt = `As an NFL analyst, provide tactical insights for this play:
+    try {
+      const analysisPrompt = `As an NFL analyst, provide tactical insights for this play:
 
 Game Situation:
 - ${gameState.homeTeam} vs ${gameState.awayTeam}
@@ -295,27 +355,27 @@ Play: ${play.description}
 
 Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or impact.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: analysisPrompt,
-      config: {
-        thinkingConfig: {
-          thinkingBudget: 0, // Disables thinking
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: analysisPrompt,
+        config: {
+          thinkingConfig: {
+            thinkingBudget: 0, // Disables thinking
+          },
         },
-      },
-    });
+      });
 
-    if (response.text) {
-      return response.text.trim();
+      if (response.text) {
+        return response.text.trim();
+      }
+
+      // 🔹 Ensure we always return a string, even if response.text is missing
+      return "Analysis unavailable - empty response";
+    } catch (error) {
+      console.error('Error generating play analysis:', error);
+      return "Analysis unavailable - error generating analysis";
     }
-
-    // 🔹 Ensure we always return a string, even if response.text is missing
-    return "Analysis unavailable - empty response";
-  } catch (error) {
-    console.error('Error generating play analysis:', error);
-    return "Analysis unavailable - error generating analysis";
   }
-}
 
   // Public method for generating context/commentary
   generateContext(play: PlayData, gameState?: GameState): string {
@@ -333,6 +393,16 @@ Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or i
     return this.currentGameId;
   }
 
+  // Get play history for chat context
+  getPlayHistory(): EnhancedPlayData[] {
+    return [...this.playHistory];
+  }
+
+  // Get current game state
+  getCurrentGameState(): GameState | null {
+    return this.currentGameState;
+  }
+
   // Subscribe to live play updates via Server-Sent Events
   subscribeToPlays(callback: (play: EnhancedPlayData) => void) {
     this.playCallbacks.push(callback);
@@ -345,6 +415,13 @@ Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or i
         try {
           const playData: PlayData = JSON.parse(event.data);
           
+          // Update current game state
+          if (this.currentGameState) {
+            this.currentGameState = this.updateGameStateFromPlay(playData, this.currentGameState);
+          } else {
+            this.currentGameState = this.getCurrentGameStateFromPlay(playData);
+          }
+          
           // Create initial enhanced play data with loading state
           const enhancedPlay: EnhancedPlayData = {
             ...playData,
@@ -352,14 +429,32 @@ Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or i
             contextInsights: this.generateContextInsights(playData)
           };
           
+          // Add to play history immediately
+          this.playHistory.push(enhancedPlay);
+          
+          // Keep only last 50 plays to manage memory
+          if (this.playHistory.length > 50) {
+            this.playHistory = this.playHistory.slice(-50);
+          }
+          
           // Send immediate callback with loading state
           this.playCallbacks.forEach(cb => cb(enhancedPlay));
           
           // Generate AI commentary asynchronously
           try {
-            const gameState = this.getCurrentGameState(playData);
+            const gameState = this.getCurrentGameStateFromPlay(playData);
             const aiCommentary = await this.generateAICommentary(playData, gameState);
-            // const aiExplanation = await this.generateAIExplanation(playData, gameState);
+            
+            // Update the play in history with AI commentary
+            const playIndex = this.playHistory.findIndex(p => 
+              p.quarter === playData.quarter && 
+              p.time === playData.time && 
+              p.description === playData.description
+            );
+            
+            if (playIndex !== -1) {
+              this.playHistory[playIndex].aiCommentary = aiCommentary;
+            }
             
             // Send updated callback with AI commentary
             const finalEnhancedPlay: EnhancedPlayData = {
@@ -374,6 +469,17 @@ Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or i
               ...enhancedPlay,
               aiCommentary: 'AI commentary failed to generate'
             };
+            
+            // Update in history
+            const playIndex = this.playHistory.findIndex(p => 
+              p.quarter === playData.quarter && 
+              p.time === playData.time && 
+              p.description === playData.description
+            );
+            
+            if (playIndex !== -1) {
+              this.playHistory[playIndex].aiCommentary = 'AI commentary failed to generate';
+            }
             
             this.playCallbacks.forEach(cb => cb(errorPlay));
           }
@@ -434,7 +540,7 @@ Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or i
   }
 
   // Get current game state for context
-  private getCurrentGameState(play: PlayData): GameState {
+  private getCurrentGameStateFromPlay(play: PlayData): GameState {
     return {
       homeTeam: this.gameContext.homeTeam || 'HOME',
       awayTeam: this.gameContext.awayTeam || 'AWAY',
@@ -608,6 +714,8 @@ Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or i
     this.gameStateCallbacks = [];
     this.connectionCallbacks = [];
     this.isConnected = false;
+    this.playHistory = [];
+    this.currentGameState = null;
   }
 
   // Set Gemini API key at runtime
