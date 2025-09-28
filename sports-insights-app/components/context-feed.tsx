@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -41,7 +41,11 @@ export function ContextFeed() {
     driveInfo: { plays: 0, yards: 0, timeOfPossession: "0:00" }
   })
 
-  // Subscribe to real-time play data
+  // Use useRef to store current gameState for callbacks
+  const gameStateRef = useRef(gameState)
+  gameStateRef.current = gameState
+
+  // Subscribe to real-time play data - NO DEPENDENCIES
   useEffect(() => {
     // Fetch team information for the current game
     const fetchTeams = async () => {
@@ -62,8 +66,11 @@ export function ContextFeed() {
     fetchTeams()
 
     const handleNewPlay = (enhancedPlay: EnhancedPlayData) => {
+      // Use ref to get current gameState to avoid stale closure
+      const currentGameState = gameStateRef.current
+      
       // Update game state from play
-      const updatedGameState = apiService.updateGameStateFromPlay(enhancedPlay, gameState)
+      const updatedGameState = apiService.updateGameStateFromPlay(enhancedPlay, currentGameState)
       setGameState(updatedGameState)
 
       const winProbChange = apiService.calculateWinProbabilityChange(enhancedPlay, updatedGameState)
@@ -124,7 +131,7 @@ export function ContextFeed() {
       apiService.unsubscribeFromConnectionStatus(handleConnectionStatus)
       apiService.unsubscribeFromGameState(handleGameStateUpdate)
     }
-  }, [gameState]) // Include gameState in dependency array
+  }, []) // ✅ EMPTY DEPENDENCY ARRAY - this is the key fix!
 
   const getPlayCategory = (play: EnhancedPlayData): "strategy" | "momentum" | "stats" | "prediction" => {
     if (play.down === 4) return "strategy"
