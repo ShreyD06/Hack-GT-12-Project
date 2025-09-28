@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, TrendingDown, Play, MoreHorizontal } from "lucide-react"
-import { apiService, PlayData } from "@/lib/api"
+import { apiService, PlayData, GameTeams } from "@/lib/api"
 
 interface ContextItem {
   id: string
@@ -22,14 +22,27 @@ export function ContextFeed() {
   const [contextItems, setContextItems] = useState<ContextItem[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
+  const [gameTeams, setGameTeams] = useState<GameTeams>({ home_team: "Loading...", away_team: "Loading..." })
 
   // Subscribe to real-time play data
   useEffect(() => {
+    // Fetch team information for the current game
+    const fetchTeams = async () => {
+      try {
+        const teams = await apiService.fetchGameTeams()
+        setGameTeams(teams)
+      } catch (error) {
+        console.error('Failed to fetch team information:', error)
+      }
+    }
+
+    fetchTeams()
+
     const handleNewPlay = (play: PlayData) => {
       const context = apiService.generateContextFromPlay(play)
       const winProbChange = apiService.calculateWinProbabilityChange(play, {
-        homeTeam: "WAS",
-        awayTeam: "ATL",
+        homeTeam: gameTeams.home_team,
+        awayTeam: gameTeams.away_team,
         homeScore: 0,
         awayScore: 0,
         quarter: "1st",
@@ -71,7 +84,7 @@ export function ContextFeed() {
       apiService.unsubscribeFromPlays(handleNewPlay)
       apiService.unsubscribeFromConnectionStatus(handleConnectionStatus)
     }
-  }, [])
+  }, [gameTeams])
 
   const getPlayCategory = (play: PlayData): "strategy" | "momentum" | "stats" | "prediction" => {
     if (play.down === 4) return "strategy"
@@ -150,16 +163,7 @@ export function ContextFeed() {
 
           <p className="text-sm text-muted-foreground mb-3 leading-relaxed">{item.context}</p>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {item.hasReplay && (
-                <Button size="sm" variant="outline" className="gap-2 h-8 bg-transparent">
-                  <Play className="w-3 h-3" />
-                  Replay
-                </Button>
-              )}
-            </div>
-
+          <div className="flex items-center justify-end">
             <Button size="sm" variant="ghost" className="text-xs text-muted-foreground">
               Learn More
             </Button>

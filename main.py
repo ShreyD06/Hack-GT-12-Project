@@ -28,6 +28,7 @@ df = pd.read_csv("pbp-2024.csv")
 # Store plays + indices per game
 game_buffers: Dict[str, List[Dict[str, Any]]] = {}
 last_sent_indices: Dict[str, int] = {}
+game_teams: Dict[str, Dict[str, str]] = {}
 
 
 def prepare_game(game_id: str):
@@ -38,6 +39,33 @@ def prepare_game(game_id: str):
         return
 
     game_df = df[df["GameId"] == int(game_id)].copy()
+
+    # Extract teams from the game data
+    teams_in_game = set()
+    for _, row in game_df.iterrows():
+        if pd.notna(row["OffenseTeam"]) and row["OffenseTeam"] != "":
+            teams_in_game.add(row["OffenseTeam"])
+        if pd.notna(row["DefenseTeam"]) and row["DefenseTeam"] != "":
+            teams_in_game.add(row["DefenseTeam"])
+    
+    teams_list = list(teams_in_game)
+    if len(teams_list) >= 2:
+        # Determine home/away teams based on game data patterns
+        # Typically, the team that appears more frequently as offense might be home
+        offense_counts = game_df["OffenseTeam"].value_counts()
+        home_team = offense_counts.index[0] if len(offense_counts) > 0 else teams_list[0]
+        away_team = teams_list[1] if teams_list[0] == home_team else teams_list[0]
+        
+        game_teams[game_id] = {
+            "home_team": home_team,
+            "away_team": away_team
+        }
+    else:
+        # Fallback if we can't determine teams properly
+        game_teams[game_id] = {
+            "home_team": "HOME",
+            "away_team": "AWAY"
+        }
 
     game_df["TotalSecondsRemaining"] = (
         (4 - game_df["Quarter"]) * 15 * 60
@@ -76,7 +104,20 @@ async def play_streamer(game_id: str):
         play_data = game_buffers[game_id][last_sent_indices[game_id]]
         yield f"data: {json.dumps(play_data)}\n\n"
         last_sent_indices[game_id] += 1
-        await asyncio.sleep(5)
+        await asyncio.sleep(10)
+
+
+@app.get("/game-teams/{game_id}")
+async def get_game_teams(game_id: str):
+    """
+    Get the teams playing in a specific game.
+    """
+    prepare_game(game_id)
+    
+    if game_id in game_teams:
+        return game_teams[game_id]
+    else:
+        return {"home_team": "HOME", "away_team": "AWAY"}
 
 
 @app.get("/stream-plays/{game_id}")

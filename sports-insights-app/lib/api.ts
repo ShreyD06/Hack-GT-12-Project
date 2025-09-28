@@ -13,6 +13,11 @@ export interface PlayData {
   yard_line: number;
 }
 
+export interface GameTeams {
+  home_team: string;
+  away_team: string;
+}
+
 export interface GameState {
   homeTeam: string;
   awayTeam: string;
@@ -41,13 +46,41 @@ class ApiService {
   private gameStateCallbacks: ((gameState: GameState) => void)[] = [];
   private connectionCallbacks: ((connected: boolean, error?: string) => void)[] = [];
   private isConnected: boolean = false;
+  private currentGameId: string = '2024122802'; // Default game ID
+
+  // Fetch team information for a specific game
+  async fetchGameTeams(gameId?: string): Promise<GameTeams> {
+    const gameIdToUse = gameId || this.currentGameId;
+    try {
+      const response = await fetch(`${API_BASE_URL}/game-teams/${gameIdToUse}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const teams = await response.json();
+      return teams;
+    } catch (error) {
+      console.error('Error fetching game teams:', error);
+      // Return fallback teams
+      return { home_team: 'HOME', away_team: 'AWAY' };
+    }
+  }
+
+  // Set the current game ID
+  setGameId(gameId: string) {
+    this.currentGameId = gameId;
+  }
+
+  // Get the current game ID
+  getGameId(): string {
+    return this.currentGameId;
+  }
 
   // Subscribe to live play updates via Server-Sent Events
   subscribeToPlays(callback: (play: PlayData) => void) {
     this.playCallbacks.push(callback);
     
     if (!this.eventSource) {
-      this.eventSource = new EventSource(`${API_BASE_URL}/stream-plays/2024122907`);
+      this.eventSource = new EventSource(`${API_BASE_URL}/stream-plays/${this.currentGameId}`);
       
       this.eventSource.onmessage = (event) => {
         try {
