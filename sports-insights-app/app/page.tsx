@@ -64,27 +64,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border">
-        <div className="flex items-center justify-around py-3">
-          <Button variant="ghost" size="sm" className="flex flex-col gap-1">
-            <div className="w-6 h-6 bg-primary rounded-sm" />
-            <span className="text-xs text-primary">Live</span>
-          </Button>
-          <Button variant="ghost" size="sm" className="flex flex-col gap-1">
-            <div className="w-6 h-6 bg-muted rounded-sm" />
-            <span className="text-xs text-muted-foreground">Highlights</span>
-          </Button>
-          <Button variant="ghost" size="sm" className="flex flex-col gap-1">
-            <div className="w-6 h-6 bg-muted rounded-sm" />
-            <span className="text-xs text-muted-foreground">Stats</span>
-          </Button>
-          <Button variant="ghost" size="sm" className="flex flex-col gap-1">
-            <div className="w-6 h-6 bg-muted rounded-sm" />
-            <span className="text-xs text-muted-foreground">Games</span>
-          </Button>
-        </div>
-      </nav>
     </div>
   )
 }

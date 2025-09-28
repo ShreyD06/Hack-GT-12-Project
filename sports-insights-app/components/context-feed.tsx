@@ -16,6 +16,7 @@ interface ContextItem {
   context: string
   aiCommentary?: string
   contextInsights?: string
+  anomalySummary?: string[]
   impact: "positive" | "negative" | "neutral"
   winProbabilityChange: number
   category: "strategy" | "momentum" | "stats" | "prediction"
@@ -95,6 +96,8 @@ export function ContextFeed() {
   // Use useRef to store current gameState for callbacks
   const gameStateRef = useRef(gameState)
   gameStateRef.current = gameState
+  // Track anomaly counts per stat to identify "new" anomalies
+  const anomalyCountsRef = useRef<Record<string, number>>({})
 
   // Subscribe to real-time play data - NO DEPENDENCIES
   useEffect(() => {
@@ -126,6 +129,34 @@ export function ContextFeed() {
 
       const winProbChange = apiService.calculateWinProbabilityChange(enhancedPlay, updatedGameState)
 
+      // Run anomaly detection on a simple rolling series (yards gained per play)
+      // Build the series with recent plays of specific types plus the current one (if matching type)
+      const allowedTypes = new Set(["PASS", "RUSH", "SCRAMBLE"])
+      const historicalYards = play_archive
+        .filter(p => allowedTypes.has(p.play_type))
+        .map(p => p.yards_gained)
+      const yardsSeries = allowedTypes.has(enhancedPlay.play_type)
+        ? [...historicalYards, enhancedPlay.yards_gained]
+        : historicalYards
+      let hasNewAnomaly = false
+      let anomalySummary: string[] | undefined = undefined
+      const statName = "Yards per play"
+      if (yardsSeries.length >= 6) {
+        const res = anomalyDetect.detectTrendChanges(yardsSeries.slice(-30), statName)
+        if (!('error' in res)) {
+          const prevCount = anomalyCountsRef.current[statName] || 0
+          const currentCount = res.anomalyDetails.length
+          if (currentCount > prevCount) {
+            hasNewAnomaly = true
+            anomalyCountsRef.current[statName] = currentCount
+            const narrative = anomalyDetect.generateNarrative(res)
+            anomalySummary = Array.isArray(narrative) ? narrative : [narrative]
+          } else {
+            anomalyCountsRef.current[statName] = currentCount
+          }
+        }
+      }
+
       // Check if this is a key moment before adding to ContextItems
       const isKey = isKeyMoment(enhancedPlay) || Math.abs(winProbChange) >= 5
 
@@ -136,6 +167,7 @@ export function ContextFeed() {
         context: enhancedPlay.aiCommentary || apiService.generateContext(enhancedPlay, updatedGameState),
         aiCommentary: enhancedPlay.aiCommentary,
         contextInsights: enhancedPlay.contextInsights,
+        anomalySummary: anomalySummary,
         impact: winProbChange > 0 ? "positive" : winProbChange < 0 ? "negative" : "neutral",
         winProbabilityChange: Math.round(winProbChange),
         category: getPlayCategory(enhancedPlay),
@@ -154,8 +186,9 @@ export function ContextFeed() {
           const updatedItems = [...prev]
           updatedItems[existingIndex] = { ...updatedItems[existingIndex], ...newItem }
           return updatedItems
-        } else if (existingIndex === -1 && isKey) {
-          // Only add new item if it's a key moment
+        } else if (existingIndex === -1 && (isKey || hasNewAnomaly)) {
+          console.log(isKey, hasNewAnomaly)
+          // Add if key moment or a new anomaly was detected for this play
           return [newItem, ...prev.slice(0, 9)] // Keep only 10 items
         }
         
@@ -164,6 +197,10 @@ export function ContextFeed() {
 
       console.log(play_archive.length)
       console.log(enhancedPlay.description)
+
+      // Update stats (on per-drive basis) for anomaly detection
+      // This is what would be used normally, but for testing we will use the play yardage series above
+      // since it takes to long to build up full drives in a demo
       if (enhancedPlay.play_type === "RUSH") {
         console.log("Rush detected")
         // check if new drive: if offense team changed
@@ -333,19 +370,6 @@ export function ContextFeed() {
         )}
       </div>
 
-      {/* Current Game State */}
-      {isConnected && (
-        <Card className="p-3 bg-card border-border">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">
-              {gameState.quarter} • {gameState.timeLeft}
-            </div>
-            <div className="text-sm">
-              {gameState.homeTeam} {gameState.homeScore} - {gameState.awayScore} {gameState.awayTeam}
-            </div>
-          </div>
-        </Card>
-      )}
 
       {contextItems.length === 0 && !connectionError && (
         <Card className="p-4 bg-card border-border">
@@ -372,28 +396,23 @@ export function ContextFeed() {
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground mb-2 leading-relaxed">{item.context}</p>
-
-          {/* Context Insights */}
-          {item.contextInsights && (
-            <div className="text-xs text-muted-foreground mb-3 p-2 bg-muted/50 rounded border-l-2 border-primary/30">
-              {item.contextInsights}
+          {item.anomalySummary && item.anomalySummary.length > 0 && (
+            <div className="mb-3 p-3 rounded-md border border-accent/40 bg-accent/10">
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="w-4 h-4 text-accent" />
+                <span className="text-xs font-semibold text-accent">Trend Report</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1">
+                {item.anomalySummary.map((line, i) => (
+                  <li key={i} className="text-xs text-foreground">{line}</li>
+                ))}
+              </ul>
             </div>
           )}
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {item.hasReplay && (
-                <Button size="sm" variant="ghost" className="text-xs text-muted-foreground">
-                  <Play className="w-3 h-3 mr-1" />
-                  Watch Play
-                </Button>
-              )}
-            </div>
-            <Button size="sm" variant="ghost" className="text-xs text-muted-foreground">
-              Learn More
-            </Button>
-          </div>
+          <p className="text-sm text-muted-foreground mb-2 leading-relaxed">{item.context}</p>
+
+
         </Card>
       ))}
     </div>

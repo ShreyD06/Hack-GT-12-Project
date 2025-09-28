@@ -249,10 +249,10 @@ export class FootballAnomalyDetector {
     }
 
     // Overall game narrative
-    const overallNarrative = this.generateOverallNarrative(results);
-    if (overallNarrative) {
-      statements.push(overallNarrative);
-    }
+    // const overallNarrative = this.generateOverallNarrative(results);
+    // if (overallNarrative) {
+    //   statements.push(overallNarrative);
+    // }
 
     return statements;
   }

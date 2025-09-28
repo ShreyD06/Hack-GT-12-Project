@@ -3,7 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 const API_BASE_URL = 'http://localhost:8000'; // Adjust this to your FastAPI server URL
 
 // Add your Gemini API key here or use environment variable
-const GEMINI_API_KEY = 'AIzaSyAKIV_XgZtXhm1JXM6nHgkp33J_--QYu0E'; // Replace this with your real API key
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY; // Replace this with your real API key
 
 // Initialize Gemini AI
 let ai: GoogleGenAI | null = null;
@@ -198,7 +198,7 @@ class ApiService {
     const gameState = this.currentGameState;
     
     const playHistoryText = recentPlays.map((play, index) => 
-      `Play ${index + 1}: Q${play.quarter} ${this.formatTimeRemaining(play.time)} - ${play.offense_team} ${play.down} & ${play.yards_to_go} at ${play.yard_line} yard line: ${play.description} (${play.yards_gained} yards)`
+      `Play ${index + 1}: Q${play.quarter} ${this.formatTimeRemaining(play.time, play.quarter)} - ${play.offense_team} ${play.down} & ${play.yards_to_go} at ${play.yard_line} yard line: ${play.description} (${play.yards_gained} yards)`
     ).join('\n');
 
     return `You are an expert NFL analyst providing real-time insights about an ongoing football game. Answer the user's question based on the current game context and play history.
@@ -547,7 +547,7 @@ Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or i
       homeScore: this.gameContext.homeScore,
       awayScore: this.gameContext.awayScore,
       quarter: `${play.quarter}${this.getOrdinalSuffix(play.quarter)}`,
-      timeLeft: this.formatTimeRemaining(play.time),
+      timeLeft: this.formatTimeRemaining(play.time, play.quarter),
       possession: play.offense_team === this.gameContext.homeTeam ? "home" : "away",
       down: play.down,
       distance: play.yards_to_go,
@@ -614,7 +614,7 @@ Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or i
     
     // Update quarter and time
     newGameState.quarter = `${play.quarter}${this.getOrdinalSuffix(play.quarter)}`;
-    newGameState.timeLeft = this.formatTimeRemaining(play.time);
+    newGameState.timeLeft = this.formatTimeRemaining(play.time, play.quarter);
     
     // Update possession
     newGameState.possession = play.offense_team === newGameState.homeTeam ? "home" : "away";
@@ -698,9 +698,15 @@ Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or i
     return suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0];
   }
 
-  private formatTimeRemaining(totalSeconds: number): string {
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
+  private formatTimeRemaining(totalSeconds: number, quarter: number): string {
+    // takes totalSeconds and converts it to quarter, min:sec format
+    const quarterLength = 15 * 60; // 15 minutes per quarter
+    const quartersRemaining = 4 - quarter;
+    const secondsFromFutureQuarters = quartersRemaining * quarterLength;
+    const quarterTimeRemaining = totalSeconds - secondsFromFutureQuarters;
+    
+    const minutes = Math.floor(quarterTimeRemaining / 60);
+    const seconds = quarterTimeRemaining % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
