@@ -25,6 +25,39 @@ interface ContextItem {
 
 export var play_archive: EnhancedPlayData[] = []
 
+// Function to check if a play is a key moment
+function isKeyMoment(play: EnhancedPlayData): boolean {
+  // Check for touchdown (reaching end zone)
+  if (play.description.toLowerCase().includes("touchdown")) {
+    return true
+  }
+  
+  // Check for big yardage plays (20+ yards)
+  if (Math.abs(play.yards_gained) >= 10) {
+    return true
+  }
+  
+  // Check for turnovers based on play description
+  const description = play.description.toLowerCase()
+  const turnoverKeywords = [
+    'interception', 'fumble', 'recovered', 'intercepted', 
+    'turnover', 'picked off', 'strip sack', 'forced fumble'
+  ]
+
+  if (turnoverKeywords.some(keyword => description.toLowerCase().includes(keyword))) {
+    return true
+  }
+  
+  // Check for 4th down conversions
+  if (play.down === 4 && play.yards_gained >= play.yards_to_go) {
+    return true
+  }
+  
+  // Check for significant win probability changes (5% or more)
+  // This will be calculated later in the function, but we can check for other criteria first
+  
+  return false
+}
 
 export function ContextFeed() {
   console.log("Rendering ContextFeed")
@@ -93,6 +126,9 @@ export function ContextFeed() {
 
       const winProbChange = apiService.calculateWinProbabilityChange(enhancedPlay, updatedGameState)
 
+      // Check if this is a key moment before adding to ContextItems
+      const isKey = isKeyMoment(enhancedPlay) || Math.abs(winProbChange) >= 5
+
       const newItem: ContextItem = {
         id: `${enhancedPlay.quarter}-${enhancedPlay.time}-${Date.now()}`,
         timestamp: `Q${enhancedPlay.quarter} ${calculateQuarterTime(enhancedPlay.time, enhancedPlay.quarter)}`,
@@ -118,14 +154,16 @@ export function ContextFeed() {
           const updatedItems = [...prev]
           updatedItems[existingIndex] = { ...updatedItems[existingIndex], ...newItem }
           return updatedItems
-        } else if (existingIndex === -1) {
-          // New item
+        } else if (existingIndex === -1 && isKey) {
+          // Only add new item if it's a key moment
           return [newItem, ...prev.slice(0, 9)] // Keep only 10 items
         }
         
         return prev
       })
 
+      console.log(play_archive.length)
+      console.log(enhancedPlay.description)
       if (enhancedPlay.play_type === "RUSH") {
         console.log("Rush detected")
         // check if new drive: if offense team changed
