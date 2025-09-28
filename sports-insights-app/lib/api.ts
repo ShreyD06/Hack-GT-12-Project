@@ -335,6 +335,7 @@ Provide 1-2 sentences of tactical analysis focusing on strategy, execution, or i
   // Subscribe to live play updates via Server-Sent Events
   subscribeToPlays(callback: (play: EnhancedPlayData) => void) {
     this.playCallbacks.push(callback);
+    console.log()
     
     if (!this.eventSource) {
       this.eventSource = new EventSource(`${API_BASE_URL}/stream-plays/${this.currentGameId}`);
