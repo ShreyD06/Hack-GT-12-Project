@@ -27,6 +27,7 @@ export interface PlayData {
   down: number;
   yards_to_go: number;
   yard_line: number;
+  play_type: string;
 }
 
 export interface GameTeams {
