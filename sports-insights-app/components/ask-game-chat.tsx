@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { X, Send, Sparkles, Clock, Target, TrendingUp } from "lucide-react"
+import { apiService } from "@/lib/api"
 
 interface ChatMessage {
   id: string
@@ -50,6 +51,8 @@ export function AskGameChat({ onClose }: AskGameChatProps) {
       content,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     }
+
+    // apiService.generateAIExplanation(content) // Call to backend (not implemented here)
 
     setMessages((prev) => [...prev, userMessage])
     setInputValue("")
