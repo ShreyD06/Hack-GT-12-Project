@@ -86,7 +86,8 @@ def prepare_game(game_id: str):
             "defense_team": row["DefenseTeam"],
             "down": row["Down"],
             "yards_to_go": row["ToGo"],
-            "yard_line": row["YardLine"]
+            "yard_line": row["YardLine"],
+            "play_type": row["PlayType"],
         }
         play_buffer.append(play)
 

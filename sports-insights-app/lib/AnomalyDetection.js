@@ -209,6 +209,214 @@ export class FootballAnomalyDetector {
     
     return summary.join('\n');
   }
+
+  // Generate human-readable narrative from results
+  generateNarrative(results) {
+    if (results.error) {
+      return "Not enough data to analyze trends yet.";
+    }
+
+    const { statName, anomalyDetails, data, rollingSlopes } = results;
+    const statements = [];
+    
+    // Convert stat names to more readable formats
+    const readableStatName = this.convertStatName(statName);
+    
+    if (anomalyDetails.length === 0) {
+      statements.push(`${readableStatName} has remained fairly consistent throughout the game.`);
+      return statements;
+    }
+
+    // Group anomalies by type for better narrative flow
+    const trendChanges = anomalyDetails.filter(a => a.types.includes('trend_change'));
+    const trendReversals = anomalyDetails.filter(a => a.types.includes('trend_reversal'));
+    const suddenChanges = anomalyDetails.filter(a => a.types.includes('sudden_change'));
+    const outliers = anomalyDetails.filter(a => a.types.includes('statistical_outlier'));
+
+    // Generate statements for trend changes
+    if (trendChanges.length > 0 || trendReversals.length > 0) {
+      statements.push(...this.generateTrendStatements(trendChanges, trendReversals, readableStatName, rollingSlopes));
+    }
+
+    // Generate statements for sudden changes
+    if (suddenChanges.length > 0) {
+      statements.push(...this.generateSuddenChangeStatements(suddenChanges, readableStatName));
+    }
+
+    // Generate statements for outliers
+    if (outliers.length > 0) {
+      statements.push(...this.generateOutlierStatements(outliers, readableStatName, data));
+    }
+
+    // Overall game narrative
+    const overallNarrative = this.generateOverallNarrative(results);
+    if (overallNarrative) {
+      statements.push(overallNarrative);
+    }
+
+    return statements;
+  }
+
+  convertStatName(statName) {
+    const conversions = {
+      'rush attempts': 'rushing',
+      'rush_attempts': 'rushing',
+      'rushAttempts': 'rushing',
+      'rushing': 'rushing',
+      
+      'pass attempts': 'passing',
+      'pass_attempts': 'passing', 
+      'passAttempts': 'passing',
+      'passing': 'passing',
+      
+      'first downs': 'first down production',
+      'first_downs': 'first down production',
+      'firstDowns': 'first down production',
+      '1st downs': 'first down production',
+      
+      'time of possession': 'time of possession',
+      'timeOfPossession': 'time of possession',
+      'time_of_possession': 'time of possession',
+      
+      'yards per play': 'offensive efficiency',
+      'yards_per_play': 'offensive efficiency',
+      'yardsPerPlay': 'offensive efficiency',
+      
+      'third down conversions': 'third down success',
+      'third_down_conversions': 'third down success',
+      'thirdDownConversions': 'third down success',
+      
+      'red zone attempts': 'red zone opportunities',
+      'turnovers': 'ball security',
+      'sacks allowed': 'pass protection',
+      'penalties': 'discipline'
+    };
+    
+    const key = statName.toLowerCase();
+    return conversions[key] || statName.toLowerCase();
+  }
+
+  generateTrendStatements(trendChanges, trendReversals, statName, rollingSlopes) {
+    const statements = [];
+    const allTrendAnomalies = [...trendChanges, ...trendReversals].sort((a, b) => a.index - b.index);
+    
+    if (allTrendAnomalies.length === 0) return statements;
+
+    // Analyze the most recent trend
+    const latestAnomaly = allTrendAnomalies[allTrendAnomalies.length - 1];
+    const currentSlope = rollingSlopes[latestAnomaly.index];
+    
+    if (trendReversals.some(r => r.index === latestAnomaly.index)) {
+      if (currentSlope > 0) {
+        statements.push(`${this.capitalize(statName)} has picked up significantly.`);
+      } else {
+        statements.push(`${this.capitalize(statName)} has dropped off notably.`);
+      }
+    } else {
+      if (currentSlope > 0.5) {
+        statements.push(`The team has been increasing their ${statName}.`);
+      } else if (currentSlope < -0.5) {
+        statements.push(`${this.capitalize(statName)} has decreased over the last few drives.`);
+      } else if (Math.abs(currentSlope) > 0.2) {
+        const direction = currentSlope > 0 ? 'uptick' : 'downtick';
+        statements.push(`There's been a slight ${direction} in ${statName} recently.`);
+      }
+    }
+
+    return statements;
+  }
+
+  generateSuddenChangeStatements(suddenChanges, statName) {
+    const statements = [];
+    
+    suddenChanges.forEach(change => {
+      if (change.description.includes('spike')) {
+        if (statName === 'rushing') {
+          statements.push(`The team suddenly emphasized the running game.`);
+        } else if (statName === 'passing') {
+          statements.push(`The offense opened up the passing attack.`);
+        } else if (statName === 'first down production') {
+          statements.push(`The offense found their rhythm and started moving the chains.`);
+        } else {
+          statements.push(`There was a sudden surge in ${statName}.`);
+        }
+      } else if (change.description.includes('drop')) {
+        if (statName === 'rushing') {
+          statements.push(`The team moved away from the running game.`);
+        } else if (statName === 'passing') {
+          statements.push(`The passing game stalled.`);
+        } else if (statName === 'first down production') {
+          statements.push(`The offense struggled to sustain drives.`);
+        } else {
+          statements.push(`There was a noticeable drop in ${statName}.`);
+        }
+      }
+    });
+
+    return statements;
+  }
+
+  generateOutlierStatements(outliers, statName, data) {
+    const statements = [];
+    const dataAvg = this.mean(data);
+    
+    outliers.forEach(outlier => {
+      const isHigh = outlier.value > dataAvg;
+      
+      if (isHigh) {
+        if (statName === 'rushing') {
+          statements.push(`The team heavily featured the running game with ${outlier.value} attempts.`);
+        } else if (statName === 'passing') {
+          statements.push(`The quarterback was very busy, throwing ${outlier.value} passes.`);
+        } else if (statName === 'first down production') {
+          statements.push(`The offense was extremely efficient, converting ${outlier.value} first downs.`);
+        } else {
+          statements.push(`${this.capitalize(statName)} was unusually high at ${outlier.value}.`);
+        }
+      } else {
+        if (statName === 'rushing') {
+          statements.push(`The running game was nearly abandoned with only ${outlier.value} attempts.`);
+        } else if (statName === 'passing') {
+          statements.push(`The passing game was minimal with just ${outlier.value} attempts.`);
+        } else if (statName === 'first down production') {
+          statements.push(`The offense struggled badly, managing only ${outlier.value} first downs.`);
+        } else {
+          statements.push(`${this.capitalize(statName)} was surprisingly low at ${outlier.value}.`);
+        }
+      }
+    });
+
+    return statements;
+  }
+
+  generateOverallNarrative(results) {
+    const { data, rollingSlopes, anomalyDetails } = results;
+    
+    // Calculate overall trend
+    const recentSlopes = rollingSlopes.slice(-3); // Last 3 periods
+    const avgRecentSlope = this.mean(recentSlopes);
+    const overallSlope = this.linearRegression(
+      Array.from({length: data.length}, (_, i) => i + 1), 
+      data
+    );
+    
+    if (anomalyDetails.length >= 3) {
+      return "This has been a game of significant strategic adjustments and momentum shifts.";
+    } else if (Math.abs(overallSlope) > 0.5) {
+      const direction = overallSlope > 0 ? 'increasing' : 'decreasing';
+      return `Overall, there's been a clear ${direction} trend throughout the game.`;
+    } else if (avgRecentSlope > 0.3) {
+      return "The trend has been positive in recent drives.";
+    } else if (avgRecentSlope < -0.3) {
+      return "The recent trend has been concerning.";
+    }
+    
+    return null;
+  }
+
+  capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
 }
 
 export const anomalyDetect = new FootballAnomalyDetector();

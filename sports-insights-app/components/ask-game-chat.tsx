@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { X, Send, Sparkles, Clock, Target, TrendingUp } from "lucide-react"
 import { apiService } from "@/lib/api"
 
+
+
 interface ChatMessage {
   id: string
   type: "user" | "assistant"

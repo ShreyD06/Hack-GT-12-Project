@@ -25,7 +25,9 @@ interface ContextItem {
 
 export var play_archive: EnhancedPlayData[] = []
 
+
 export function ContextFeed() {
+  console.log("Rendering ContextFeed")
   const [contextItems, setContextItems] = useState<ContextItem[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
@@ -45,12 +47,18 @@ export function ContextFeed() {
     driveInfo: { plays: 0, yards: 0, timeOfPossession: "0:00" }
   })
   // Stats for anomaly detection
-  var rushes_per_drive: number[] = []
-  var passes_per_drive: number[] = []
-  var completions_per_drive: number[] = []
-  var rush_counter = 0
-  var pass_counter = 0
-  var completion_counter = 0
+  var rushes_per_drive_team1: number[] = []
+  var rushes_per_drive_team2: number[] = []
+  var passes_per_drive_team1: number[] = []
+  var passes_per_drive_team2: number[] = []
+  var completions_per_drive_team1: number[] = []
+  var completions_per_drive_team2: number[] = []
+  var rush_counter_team1 = 0
+  var rush_counter_team2 = 0
+  var pass_counter_team1 = 0
+  var pass_counter_team2 = 0
+  var completion_counter_team1 = 0
+  var completion_counter_team2 = 0
   // Use useRef to store current gameState for callbacks
   const gameStateRef = useRef(gameState)
   gameStateRef.current = gameState
@@ -118,31 +126,74 @@ export function ContextFeed() {
         return prev
       })
 
-      if (enhancedPlay.play_type === "Run") {
+      if (enhancedPlay.play_type === "RUSH") {
+        console.log("Rush detected")
         // check if new drive: if offense team changed
         if (play_archive.length > 0 && play_archive[play_archive.length - 1].offense_team !== enhancedPlay.offense_team) {
-          rushes_per_drive.push(rush_counter)
-          rush_counter = 0
+          if (enhancedPlay.offense_team === gameTeams.home_team) {
+            rushes_per_drive_team2.push(rush_counter_team2)
+            rush_counter_team2 = 0
+            rush_counter_team2 ++
+          } else {
+            rushes_per_drive_team1.push(rush_counter_team1)
+            rush_counter_team1 = 0
+            rush_counter_team1 ++
+          }
+        } else {
+          if (enhancedPlay.offense_team === gameTeams.home_team) {
+            rush_counter_team2 ++
+          } else {
+            rush_counter_team1 ++
+          }
         }
-        rush_counter += 1
-      } else if (enhancedPlay.play_type === "Pass") {
+        
+      } else if (enhancedPlay.play_type === "PASS") {
+          console.log("Pass detected")
           if (play_archive.length > 0 && play_archive[play_archive.length - 1].offense_team !== enhancedPlay.offense_team) {
-            passes_per_drive.push(pass_counter)
-            pass_counter = 0
+            if (enhancedPlay.offense_team === gameTeams.home_team) {
+              passes_per_drive_team2.push(pass_counter_team2)
+              pass_counter_team2 = 0
+              pass_counter_team2 ++
+            } else {
+              passes_per_drive_team1.push(pass_counter_team1)
+              pass_counter_team1 = 0
+              pass_counter_team1 ++
+            }
+          } else {
+            if (enhancedPlay.offense_team === gameTeams.home_team) {
+              pass_counter_team2 ++
+            } else {
+              pass_counter_team1 ++
+            }
           }
-          pass_counter += 1
           if (enhancedPlay.description.toLowerCase().includes("incomplete") === false && play_archive[play_archive.length - 1].offense_team !== enhancedPlay.offense_team) {
-            completions_per_drive.push(completion_counter)
-            completion_counter = 0
+            if (enhancedPlay.offense_team === gameTeams.home_team) {
+              completions_per_drive_team2.push(completion_counter_team2)
+              completion_counter_team2 = 0
+              completion_counter_team2 ++
+            } else {
+              completions_per_drive_team1.push(completion_counter_team1)
+              completion_counter_team1 = 0
+              completion_counter_team1 ++
+            }
+          } else if (enhancedPlay.description.toLowerCase().includes("incomplete") === false) {
+            if (enhancedPlay.offense_team === gameTeams.home_team) {
+              completion_counter_team2 ++
+            } else {
+              completion_counter_team1 ++
+            }
           }
-          completion_counter += 1
-      }
+
+        }
       // Add play to archive
       play_archive.push(enhancedPlay)
 
       // run Anomaly Detection
-      const res = anomalyDetect.detectTrendChanges(rushes_per_drive, "Rushes per drive")
-      console.log(res)
+      // const res = anomalyDetect.detectTrendChanges(rushes_per_drive_team1, "Rushes per drive")
+      // console.log(res)
+      const res = anomalyDetect.detectTrendChanges([0, 1, 2, 3, 6, 10, 3, 1, 5], "Rushes per drive")
+      console.log(res['summary'])
+      console.log(anomalyDetect.generateNarrative(res))
 
       setIsConnected(true)
       setConnectionError(null)
