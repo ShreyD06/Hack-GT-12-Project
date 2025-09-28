@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { X, Send, Sparkles, Clock, Target, TrendingUp } from "lucide-react"
+import { X, Send, Sparkles, AlertCircle, Loader2 } from "lucide-react"
 import { apiService } from "@/lib/api"
 
 
@@ -14,6 +14,8 @@ interface ChatMessage {
   content: string
   timestamp: string
   suggestions?: string[]
+  isLoading?: boolean
+  error?: boolean
 }
 
 interface AskGameChatProps {
@@ -25,27 +27,26 @@ export function AskGameChat({ onClose }: AskGameChatProps) {
     {
       id: "1",
       type: "assistant",
-      content: "Hi! I'm your live game analyst. Ask me anything about what's happening in the game right now.",
-      timestamp: "12:34 PM",
+      content: "Hi! I'm your live game analyst. I have access to all the plays that have happened so far in this game. Ask me anything about the current situation, team performance, or any specific plays you'd like me to explain!",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       suggestions: [
-        "Why are they running so much?",
-        "What's the win probability?",
-        "Explain that last play call",
-        "How does weather affect this game?",
-      ],
+        "What's the current game situation?",
+        "How are the teams performing?",
+        "Explain the last play"
+      ]
     },
   ])
   const [inputValue, setInputValue] = useState("")
+  const [isGenerating, setIsGenerating] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const quickQuestions = [
-    { icon: Clock, text: "Why are they running so much?", category: "Strategy" },
-    { icon: Target, text: "Explain that play call", category: "Tactics" },
-    { icon: TrendingUp, text: "What changed the momentum?", category: "Analysis" },
-    { icon: Sparkles, text: "Predict next play", category: "Prediction" },
-  ]
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
 
-  const handleSendMessage = (content: string) => {
-    if (!content.trim()) return
+  const handleSendMessage = async (content: string) => {
+    if (!content.trim() || isGenerating) return
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -54,52 +55,72 @@ export function AskGameChat({ onClose }: AskGameChatProps) {
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     }
 
-    // apiService.generateAIExplanation(content) // Call to backend (not implemented here)
-
+    // Add user message
     setMessages((prev) => [...prev, userMessage])
     setInputValue("")
+    setIsGenerating(true)
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = {
-        "Why are they running so much?": {
-          content:
-            "They're ahead 21-17 with 8 minutes left — running keeps the clock moving and lowers risk of turnovers. Their run game is averaging 4.2 yards per carry today, which is above their season average of 3.8.",
-          suggestions: ["Show me their rushing stats", "Compare to league average", "What if they fall behind?"],
-        },
-        "Explain that play call": {
-          content:
-            "That was a play-action pass on 1st & 10. With their strong running game today, the defense bit on the fake, creating a 1-on-1 matchup downfield. Smart call given the game situation.",
-          suggestions: ["Show success rate of play-action", "Why not run again?", "Defensive reaction analysis"],
-        },
-        "What changed the momentum?": {
-          content:
-            "The momentum shifted after that defensive sack 4 minutes ago. It dropped the Bills' win probability from 44% to 32% and forced them into a 3rd & long situation they couldn't convert.",
-          suggestions: ["Show win probability chart", "Defensive pressure stats", "How to regain momentum?"],
-        },
-        "Predict next play": {
-          content:
-            "Based on down & distance (2nd & 7) and game situation, I predict a 65% chance of run, 35% pass. They've run on 78% of similar situations today when leading in the 4th quarter.",
-          suggestions: ["Show play prediction accuracy", "Historical tendencies", "What would you call?"],
-        },
-      }
+    // Add loading message
+    const loadingMessage: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      type: "assistant",
+      content: "Analyzing game data and generating response...",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      isLoading: true,
+    }
 
-      const response = responses[content as keyof typeof responses] || {
-        content:
-          "Great question! Based on the current game state and historical data, here's what I can tell you about that situation...",
-        suggestions: ["Tell me more", "Show the stats", "Compare to other games"],
-      }
+    setMessages((prev) => [...prev, loadingMessage])
 
+    try {
+      // Generate AI response using the enhanced API service
+      const { content: aiContent, suggestions } = await apiService.generateChatResponse(content)
+      
+      // Replace loading message with actual response
       const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: loadingMessage.id,
         type: "assistant",
-        content: response.content,
+        content: aiContent,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        suggestions: response.suggestions,
+        suggestions,
       }
 
-      setMessages((prev) => [...prev, assistantMessage])
-    }, 1000)
+      setMessages((prev) => 
+        prev.map(msg => msg.id === loadingMessage.id ? assistantMessage : msg)
+      )
+    } catch (error) {
+      console.error('Error generating chat response:', error)
+      
+      // Replace loading message with error message
+      const errorMessage: ChatMessage = {
+        id: loadingMessage.id,
+        type: "assistant",
+        content: "I'm sorry, I encountered an error while analyzing the game data. Please make sure the Gemini API key is configured correctly and try again.",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        error: true,
+        suggestions: [
+          "Try asking again",
+          "What's the current score?",
+          "How many plays have happened?"
+        ]
+      }
+
+      setMessages((prev) => 
+        prev.map(msg => msg.id === loadingMessage.id ? errorMessage : msg)
+      )
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    handleSendMessage(suggestion)
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage(inputValue)
+    }
   }
 
   return (
@@ -112,7 +133,7 @@ export function AskGameChat({ onClose }: AskGameChatProps) {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">Ask the Game</h2>
-            <p className="text-xs text-muted-foreground">Live AI Analysis</p>
+            <p className="text-xs text-muted-foreground">Live AI Analysis with Full Game Context</p>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onClose}>
@@ -120,57 +141,63 @@ export function AskGameChat({ onClose }: AskGameChatProps) {
         </Button>
       </div>
 
-      {/* Quick Questions */}
-      <div className="p-4 border-b border-border bg-secondary/20">
-        <p className="text-sm text-muted-foreground mb-3">Quick Questions:</p>
-        <div className="grid grid-cols-2 gap-2">
-          {quickQuestions.map((question, index) => (
-            <Button
-              key={index}
-              variant="outline"
-              size="sm"
-              className="justify-start gap-2 h-auto p-3 text-left bg-transparent"
-              onClick={() => handleSendMessage(question.text)}
-            >
-              <question.icon className="w-4 h-4 text-primary" />
-              <div>
-                <div className="text-xs font-medium">{question.text}</div>
-                <div className="text-xs text-muted-foreground">{question.category}</div>
-              </div>
-            </Button>
-          ))}
-        </div>
-      </div>
-
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
           <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
             <div
-              className={`max-w-[80%] ${message.type === "user" ? "bg-primary text-primary-foreground" : "bg-card border border-border"} rounded-lg p-3`}
+              className={`max-w-[85%] ${
+                message.type === "user" 
+                  ? "bg-primary text-primary-foreground" 
+                  : message.error
+                    ? "bg-destructive/10 border border-destructive/20"
+                    : "bg-card border border-border"
+              } rounded-lg p-3`}
             >
-              <p className="text-sm leading-relaxed">{message.content}</p>
-              <p className="text-xs opacity-70 mt-2">{message.timestamp}</p>
+              {message.isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <p className="text-sm">{message.content}</p>
+                </div>
+              ) : (
+                <>
+                  {message.error && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="w-4 h-4 text-destructive" />
+                      <span className="text-xs text-destructive font-medium">Error</span>
+                    </div>
+                  )}
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                </>
+              )}
+              
+              <p className={`text-xs mt-2 ${message.type === "user" ? "opacity-70" : "opacity-60"}`}>
+                {message.timestamp}
+              </p>
 
-              {message.suggestions && (
+              {message.suggestions && !message.isLoading && (
                 <div className="mt-3 space-y-2">
                   <p className="text-xs opacity-70">Follow-up questions:</p>
-                  {message.suggestions.map((suggestion, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs h-7 mr-2 bg-transparent"
-                      onClick={() => handleSendMessage(suggestion)}
-                    >
-                      {suggestion}
-                    </Button>
-                  ))}
+                  <div className="flex flex-wrap gap-2">
+                    {message.suggestions.map((suggestion, index) => (
+                      <Button
+                        key={index}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 bg-transparent hover:bg-muted"
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        disabled={isGenerating}
+                      >
+                        {suggestion}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
@@ -179,12 +206,61 @@ export function AskGameChat({ onClose }: AskGameChatProps) {
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Ask about the game..."
+            placeholder={isGenerating ? "Generating response..." : "Ask about the game..."}
             className="flex-1"
-            onKeyPress={(e) => e.key === "Enter" && handleSendMessage(inputValue)}
+            onKeyPress={handleKeyPress}
+            disabled={isGenerating}
           />
-          <Button onClick={() => handleSendMessage(inputValue)} disabled={!inputValue.trim()} className="gap-2">
-            <Send className="w-4 h-4" />
+          <Button 
+            onClick={() => handleSendMessage(inputValue)} 
+            disabled={!inputValue.trim() || isGenerating} 
+            className="gap-2"
+          >
+            {isGenerating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
+        
+        {/* Quick action buttons */}
+        <div className="flex flex-wrap gap-2 mt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs h-7"
+            onClick={() => handleSendMessage("What's the current game situation?")}
+            disabled={isGenerating}
+          >
+            Game Status
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs h-7"
+            onClick={() => handleSendMessage("Explain the last play")}
+            disabled={isGenerating}
+          >
+            Last Play
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs h-7"
+            onClick={() => handleSendMessage("How are both teams performing so far?")}
+            disabled={isGenerating}
+          >
+            Team Performance
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs h-7"
+            onClick={() => handleSendMessage("What should the offense do next?")}
+            disabled={isGenerating}
+          >
+            Strategy Advice
           </Button>
         </div>
       </div>

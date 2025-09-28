@@ -105,7 +105,7 @@ async def play_streamer(game_id: str):
         play_data = game_buffers[game_id][last_sent_indices[game_id]]
         yield f"data: {json.dumps(play_data)}\n\n"
         last_sent_indices[game_id] += 1
-        await asyncio.sleep(10)
+        await asyncio.sleep(20)
 
 
 @app.get("/game-teams/{game_id}")
