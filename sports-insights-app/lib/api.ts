@@ -1,9 +1,9 @@
 import { GoogleGenAI } from '@google/genai';
 
-const API_BASE_URL = 'http://localhost:8000'; // Adjust this to your FastAPI server URL
+const API_BASE_URL = 'http://localhost:8000';
 
-// Add your Gemini API key here or use environment variable
-const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY; // Replace this with your real API key
+// Get Gemini API key from environment variable
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
 // Initialize Gemini AI
 let ai: GoogleGenAI | null = null;
@@ -96,7 +96,7 @@ class ApiService {
   // Initialize or reinitialize Gemini with API key
   initializeGemini(apiKey?: string) {
     const keyToUse = apiKey || GEMINI_API_KEY;
-    if (keyToUse && keyToUse !== 'YOUR_ACTUAL_API_KEY_GOES_HERE') {
+    if (keyToUse && keyToUse !== 'your_actual_gemini_api_key_here') {
       try {
         ai = new GoogleGenAI({ apiKey: keyToUse });
         console.log('Gemini AI initialized successfully');
